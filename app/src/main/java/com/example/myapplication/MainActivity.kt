@@ -1,10 +1,21 @@
 package com.example.myapplication
 
+import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.TextUtils
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.util.Log
+import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.text.TextUtilsCompat
 import androidx.core.widget.ContentLoadingProgressBar
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -43,15 +54,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
-
+        progressBar.show()
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 val paris = listOf<String>(
                     "0xf040eD78e6880Af04D5040c1C96F038A75eeFa9F",
                     "0xEF15db98153D03a014C93C871524394579e16eC9",
-                    "0xe46E6a3C5d4472a04794aF7f7ab3862df35C0229",
-                    "0xE875671d5fC032b4636eA0640575a338f3bD4787",
-                    "0x1cf77b56db68d287953ec2070954f73203b2682d"
+//                    "0xe46E6a3C5d4472a04794aF7f7ab3862df35C0229",
+//                    "0xE875671d5fC032b4636eA0640575a338f3bD4787",
+//                    "0x1cf77b56db68d287953ec2070954f73203b2682d"
                 )
                 val oldestN = 30
 
@@ -146,15 +157,39 @@ class MainActivity : AppCompatActivity() {
                     }
                 }.sortedByDescending {
                     it.second.size
-                }.forEach {
+                }.map {
                     val tokens = it.second.map {
-                        "bought token [${it.key}] ${it.value.size}(${it.value}) times"
+                        "bought token [${it.key}] ${it.value.size}(${it.value.map { "$it(${(it + 1) % oldestN})" }}) times"
                     }.toList().joinToString(", \n")
 //                    println("Address [${it.first}]:\n${tokens}")
-                    Log.e("my", "Address [${it.first}]:\n${tokens}")
+                    val row = "Address [${it.first}]:\n${tokens}"
+                    Log.e("my", row)
 
+                    val ss = SpannableString(row)
+                    val clickableSpan = object:ClickableSpan() {
+                        override fun onClick(p0: View) {
+                            Toast.makeText(this@MainActivity, "Text copied to clipboard.", Toast.LENGTH_SHORT).show()
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            super.updateDrawState(ds)
+                            ds.isUnderlineText = false
+                        }
+                    }
+                    val start = row.indexOf(it.first)
+                    val end = start + it.first.length
+                    ss.setSpan(clickableSpan,start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                    ss
+                }.let {
                     progressBar.hide()
-                    textView.text = "Address [${it.first}]:\n${tokens}"
+                    val builder = SpannableStringBuilder()
+                    it.forEach {
+                        builder.appendLine(it)
+                    }
+                    textView.text = builder
+                    textView.movementMethod = LinkMovementMethod.getInstance()
+                    textView.highlightColor = Color.TRANSPARENT
                 }
             }
         }
