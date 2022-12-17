@@ -1,13 +1,16 @@
 package com.example.myapplication
 
+import android.R.attr.label
+import android.app.ProgressDialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Color
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
-import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.util.Log
@@ -15,7 +18,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.text.TextUtilsCompat
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.ContentLoadingProgressBar
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -23,17 +26,13 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.facebook.stetho.okhttp3.StethoInterceptor
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.*
-import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.internal.filterList
 import org.jetbrains.annotations.TestOnly
 import java.io.*
-import java.util.Timer
-import java.util.logging.Logger
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -46,23 +45,25 @@ class MainActivity : AppCompatActivity() {
     private val textView: TextView by lazy {
         findViewById(R.id.textView)
     }
-    private val progressBar: ContentLoadingProgressBar by lazy {
-        findViewById(R.id.progressBar)
+
+    private val progressDialog:ProgressDialog by lazy {
+        ProgressDialog(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
-        progressBar.show()
+        progressDialog.show()
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 val paris = listOf<String>(
-                    "0xf040eD78e6880Af04D5040c1C96F038A75eeFa9F",
-                    "0xEF15db98153D03a014C93C871524394579e16eC9",
+//                    "0xf040eD78e6880Af04D5040c1C96F038A75eeFa9F",
+//                    "0xEF15db98153D03a014C93C871524394579e16eC9",
 //                    "0xe46E6a3C5d4472a04794aF7f7ab3862df35C0229",
 //                    "0xE875671d5fC032b4636eA0640575a338f3bD4787",
-//                    "0x1cf77b56db68d287953ec2070954f73203b2682d"
+//                    "0x1cf77b56db68d287953ec2070954f73203b2682d",
+                    "0xc754b7eEd1D31eA8017F581C4C9cd7dd86a969CB"
                 )
                 val oldestN = 30
 
@@ -169,6 +170,10 @@ class MainActivity : AppCompatActivity() {
                     val clickableSpan = object:ClickableSpan() {
                         override fun onClick(p0: View) {
                             Toast.makeText(this@MainActivity, "Text copied to clipboard.", Toast.LENGTH_SHORT).show()
+                            val clipboard: ClipboardManager =
+                                getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText(null, it.first)
+                            clipboard.setPrimaryClip(clip)
                         }
 
                         override fun updateDrawState(ds: TextPaint) {
@@ -182,7 +187,7 @@ class MainActivity : AppCompatActivity() {
 
                     ss
                 }.let {
-                    progressBar.hide()
+                    progressDialog.hide()
                     val builder = SpannableStringBuilder()
                     it.forEach {
                         builder.appendLine(it)
