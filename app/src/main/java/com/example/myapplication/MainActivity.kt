@@ -6,6 +6,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.icu.text.MessageFormat
+import android.os.Build
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
@@ -19,10 +21,12 @@ import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.collection.SparseArrayCompat
 import androidx.core.widget.ContentLoadingProgressBar
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.SortedList
 import com.facebook.stetho.okhttp3.StethoInterceptor
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.*
@@ -32,6 +36,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jetbrains.annotations.TestOnly
 import java.io.*
+import java.util.*
+import kotlin.collections.LinkedHashSet
 
 
 class MainActivity : AppCompatActivity() {
@@ -58,14 +64,15 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 val paris = listOf<String>(
-//                    "0xf040eD78e6880Af04D5040c1C96F038A75eeFa9F",
-//                    "0xEF15db98153D03a014C93C871524394579e16eC9",
-//                    "0xe46E6a3C5d4472a04794aF7f7ab3862df35C0229",
-//                    "0xE875671d5fC032b4636eA0640575a338f3bD4787",
-//                    "0x1cf77b56db68d287953ec2070954f73203b2682d",
+                    "0xf040eD78e6880Af04D5040c1C96F038A75eeFa9F",
+                    "0xEF15db98153D03a014C93C871524394579e16eC9",
+                    "0xe46E6a3C5d4472a04794aF7f7ab3862df35C0229",
+                    "0xE875671d5fC032b4636eA0640575a338f3bD4787",
+                    "0x1cf77b56db68d287953ec2070954f73203b2682d",
                     "0xc754b7eEd1D31eA8017F581C4C9cd7dd86a969CB"
                 )
                 val oldestN = 30
+                val baseTokenSymbols = LinkedHashSet<String>()
 
                 paris.map {
                     withContext(Dispatchers.IO + CoroutineExceptionHandler { coroutineContext, throwable ->
@@ -92,6 +99,7 @@ class MainActivity : AppCompatActivity() {
                                     val history =
                                         gson.fromJson(it.body?.string(), History::class.java)
                                     isTradingHistoryNull = history.tradingHistory != null
+                                    baseTokenSymbols.add(history.baseTokenSymbol?:"Unknown Token")
 
                                     history.tradingHistory?.filterNotNull()?.let {
                                         tb = it.lastOrNull()?.blockTimestamp
@@ -139,7 +147,9 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }.apply {
+
                     Log.e("my", "Is the result(${this.size}) equal to ${oldestN * paris.size}?")
+                    Log.e("my", baseTokenSymbols.toString())
                     Log.e("my", this.joinToString(",\n"))
 
                 }.mapIndexed { index, s ->
@@ -159,8 +169,9 @@ class MainActivity : AppCompatActivity() {
                 }.sortedByDescending {
                     it.second.size
                 }.map {
+                    val tokenSymbolsArray = baseTokenSymbols.toArray()
                     val tokens = it.second.map {
-                        "bought token [${it.key}] ${it.value.size}(${it.value.map { "$it(${(it + 1) % oldestN})" }}) times"
+                        "bought token [${tokenSymbolsArray[it.key]}] ${it.value.size} times ${it.value.map { "$it -> ${toOrdinal((it + 1) % (oldestN + 1))}" }}"
                     }.toList().joinToString(", \n")
 //                    println("Address [${it.first}]:\n${tokens}")
                     val row = "Address [${it.first}]:\n${tokens}"
@@ -198,6 +209,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    fun toOrdinal(day: Int): String {
+        val formatter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            MessageFormat("{0,ordinal}", Locale.getDefault())
+        } else {
+            TODO("VERSION.SDK_INT < N")
+        }
+        return formatter.format(arrayOf(day))
     }
 }
 
