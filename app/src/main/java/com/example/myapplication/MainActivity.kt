@@ -1,6 +1,5 @@
 package com.example.myapplication
 
-import android.R.attr.label
 import android.app.ProgressDialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -18,15 +17,14 @@ import android.text.style.ClickableSpan
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.collection.SparseArrayCompat
-import androidx.core.widget.ContentLoadingProgressBar
+import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.recyclerview.widget.SortedList
 import com.facebook.stetho.okhttp3.StethoInterceptor
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.*
@@ -37,8 +35,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.jetbrains.annotations.TestOnly
 import java.io.*
 import java.util.*
-import kotlin.collections.LinkedHashSet
-
 
 class MainActivity : AppCompatActivity() {
 
@@ -48,29 +44,50 @@ class MainActivity : AppCompatActivity() {
 
     val gson = GsonBuilder().create()
 
-    private val textView: TextView by lazy {
-        findViewById(R.id.textView)
+    private val textViewResults: TextView by lazy {
+        findViewById(R.id.textViewResults)
+    }
+
+    private val textViewParis: TextView by lazy {
+        findViewById(R.id.textViewParis)
+    }
+
+    private val buttonStart: Button by lazy {
+        findViewById(R.id.buttonStart)
     }
 
     private val progressDialog:ProgressDialog by lazy {
-        ProgressDialog(this)
+        ProgressDialog(this).apply {
+            this.setCanceledOnTouchOutside(false)
+        }
     }
+
+    /*
+        "0xe00ed75bf786c4bc5a2bc700f82d58a13efbe993",
+        "0xe2773ac103bc59b6abdc77722c516ad4a70961f8",
+        "0xd16dc7b67afd1bc2e6eb1ca679f7ff25a23dd62b",
+        "0x94308d1ec11d21c19dfa109cb2d52b43164108e7",
+        "0x5b7f957086a694270d2ff6c92359ccc403215453",
+        "0x9866930060bc5f532dc1b9db721069720564fd12",
+        "0x05c4ca5dca0d347da5d174a7b6987dee658c53ed",
+        "0x19630d70c9d2d5d4f18b779d7cb79fc98342a9c4",
+        "0x0d74ad9986e08a1d02279a755e6bd7a04c4d7053",
+        "0x6b9ce687f36de450a729256a168522d9c093e9c1"
+     */
+    private val paris = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
-        progressDialog.show()
-        lifecycleScope.launch {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                val paris = listOf<String>(
-                    "0xf040eD78e6880Af04D5040c1C96F038A75eeFa9F",
-                    "0xEF15db98153D03a014C93C871524394579e16eC9",
-                    "0xe46E6a3C5d4472a04794aF7f7ab3862df35C0229",
-                    "0xE875671d5fC032b4636eA0640575a338f3bD4787",
-                    "0x1cf77b56db68d287953ec2070954f73203b2682d",
-                    "0xc754b7eEd1D31eA8017F581C4C9cd7dd86a969CB"
-                )
+
+        buttonStart.setOnClickListener {
+            lifecycleScope.launch {
+//                lifecycle.repeatOnLifecycle(Lifecycle.State.CREATED) {
+//
+//                }
+                progressDialog.show()
+
                 val oldestN = 30
                 val baseTokenSymbols = LinkedHashSet<String>()
 
@@ -203,9 +220,9 @@ class MainActivity : AppCompatActivity() {
                     it.forEach {
                         builder.appendLine(it)
                     }
-                    textView.text = builder
-                    textView.movementMethod = LinkMovementMethod.getInstance()
-                    textView.highlightColor = Color.TRANSPARENT
+                    textViewResults.text = builder
+                    textViewResults.movementMethod = LinkMovementMethod.getInstance()
+                    textViewResults.highlightColor = Color.TRANSPARENT
                 }
             }
         }
@@ -218,6 +235,26 @@ class MainActivity : AppCompatActivity() {
             TODO("VERSION.SDK_INT < N")
         }
         return formatter.format(arrayOf(day))
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            if (clipboard.hasPrimaryClip() && clipboard.primaryClip != null) {
+                val clip: String =
+                    clipboard.primaryClip?.getItemAt(0)?.coerceToText(this)
+                        .toString()
+
+                if (paris.contains(clip).not()) {
+                    Toast.makeText(this, "Detected: $clip", Toast.LENGTH_SHORT).show()
+                    paris.add(clip)
+                }
+
+                textViewParis.text = paris.joinToString(",\n")
+                buttonStart.isVisible = paris.isNotEmpty()
+            }
+        }
     }
 }
 
