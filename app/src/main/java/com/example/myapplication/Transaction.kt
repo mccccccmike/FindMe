@@ -16,3 +16,14 @@ data class Result(
     @SerializedName("to")
     val to: String?
 )
+
+data class Pair(
+    val code: String?,
+    val `data`: List<Data?>?
+)
+
+data class Data(
+    val name: String?,
+    val symbol: String?,
+    val symbolRef: String?
+)

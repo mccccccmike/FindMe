@@ -96,15 +96,33 @@ class MainActivity : AppCompatActivity() {
                         // do nothing
                         Log.e("my", throwable.message ?: "trading-history Unknown Error")
                     }) {
+                        // get token symbol
+                        client.newCall(Request.Builder().url("https://www.dextools.io/shared/data/pair?address=$it&chain=ether").build()).execute().use {
+                            if (it.isSuccessful) {
+                                val pair =
+                                    gson.fromJson(it.body?.string(), Pair::class.java)
+                                val base = pair.data?.firstOrNull()?.run {
+                                    "${this.symbol}/${this.symbolRef} ${this.name}"
+                                }?:"Unknown Token"
+                                baseTokenSymbols.add(base)
+
+                            } else {
+                                baseTokenSymbols.add(it.message)
+                            }
+                        }
+
+                        // get trading history
                         var isTradingHistoryNull: Boolean
                         var tb: Long? = null
                         val pair = it
                         val tradingHistory = mutableListOf<TradingHistory>()
                         do {
                             val url = if (tb == null) {
-                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                                "https://io.dexscreener.com/dex/log/amm/uniswap/all/ethereum/$pair?q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+//                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
                             } else {
-                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?tb=$tb&q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                                "https://io.dexscreener.com/dex/log/amm/uniswap/all/ethereum/$pair?tb=$tb&q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+//                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?tb=$tb&q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
                             }
 
                             val request = okhttp3.Request.Builder()
@@ -115,10 +133,10 @@ class MainActivity : AppCompatActivity() {
                                 if (it.isSuccessful) {
                                     val history =
                                         gson.fromJson(it.body?.string(), History::class.java)
-                                    isTradingHistoryNull = history.tradingHistory != null
-                                    baseTokenSymbols.add(history.baseTokenSymbol?:"Unknown Token")
+                                    isTradingHistoryNull = history.logs != null
+//                                    baseTokenSymbols.add(history.baseTokenSymbol?:"Unknown Token")
 
-                                    history.tradingHistory?.filterNotNull()?.let {
+                                    history.logs?.filterNotNull()?.let {
                                         tb = it.lastOrNull()?.blockTimestamp
                                         tradingHistory.addAll(it)
                                     }
@@ -131,38 +149,41 @@ class MainActivity : AppCompatActivity() {
 
                         // need to filter out buy transactions
                         tradingHistory
-                            .filter { it.type == "buy" }
+                            .filter { it.txnType == "buy" }
                             .takeLast(oldestN).reversed()
                     }
                 }.flatMap {
                     it
                 }.mapNotNull {
-                    withContext(Dispatchers.IO + CoroutineExceptionHandler { coroutineContext, throwable ->
-                        // do nothing
-                        Log.e("my", throwable.message ?: "eth_getTransactionByHash Unknown Error")
-                    }) {
-                        val mediaType = "application/json".toMediaTypeOrNull()
-                        val body =
-                            "{\"id\":1,\"jsonrpc\":\"2.0\",\"params\":[\"${it.txnHash}\"],\"method\":\"eth_getTransactionByHash\"}".toRequestBody(
-                                mediaType
-                            )
-                        val request = Request.Builder()
-                            .url("https://eth-mainnet.g.alchemy.com/v2/Q5sH2zvE_fu5H1XI4RC09iQXlSHIbJPS")
-                            .post(body)
-                            .addHeader("accept", "application/json")
-                            .addHeader("content-type", "application/json")
-                            .build()
+                    it.maker
 
-                        client.newCall(request).execute().use {
-                            if (it.isSuccessful) {
-                                val transaction =
-                                    gson.fromJson(it.body?.string(), Transaction::class.java)
-                                transaction.result?.from
-                            } else {
-                                null
-                            }
-                        }
-                    }
+//                    Before, We are making http calls for getting the maker of the transaction...
+//                    withContext(Dispatchers.IO + CoroutineExceptionHandler { coroutineContext, throwable ->
+//                        // do nothing
+//                        Log.e("my", throwable.message ?: "eth_getTransactionByHash Unknown Error")
+//                    }) {
+//                        val mediaType = "application/json".toMediaTypeOrNull()
+//                        val body =
+//                            "{\"id\":1,\"jsonrpc\":\"2.0\",\"params\":[\"${it.txnHash}\"],\"method\":\"eth_getTransactionByHash\"}".toRequestBody(
+//                                mediaType
+//                            )
+//                        val request = Request.Builder()
+//                            .url("https://eth-mainnet.g.alchemy.com/v2/Q5sH2zvE_fu5H1XI4RC09iQXlSHIbJPS")
+//                            .post(body)
+//                            .addHeader("accept", "application/json")
+//                            .addHeader("content-type", "application/json")
+//                            .build()
+//
+//                        client.newCall(request).execute().use {
+//                            if (it.isSuccessful) {
+//                                val transaction =
+//                                    gson.fromJson(it.body?.string(), Transaction::class.java)
+//                                transaction.result?.from
+//                            } else {
+//                                null
+//                            }
+//                        }
+//                    }
                 }.apply {
 
                     Log.e("my", "Is the result(${this.size}) equal to ${oldestN * paris.size}?")
@@ -246,8 +267,18 @@ class MainActivity : AppCompatActivity() {
                     clipboard.primaryClip?.getItemAt(0)?.coerceToText(this)
                         .toString()
 
-                if (paris.contains(clip).not()) {
+                if (clip.contains(",")) {
                     Toast.makeText(this, "Detected: $clip", Toast.LENGTH_SHORT).show()
+
+                    paris.addAll(clip.split(",").filter { it.isNotBlank() }.map {
+                        it.trim()
+                    })
+                    paris.forEach {
+                        Log.d("my", "it = $it")
+                    }
+                } else if (paris.contains(clip).not()) {
+                    Toast.makeText(this, "Detected: $clip", Toast.LENGTH_SHORT).show()
+
                     paris.add(clip)
                 }
 
