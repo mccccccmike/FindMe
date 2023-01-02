@@ -89,7 +89,7 @@ class MainActivity : AppCompatActivity() {
                 progressDialog.show()
 
                 val oldestN = 30
-                val baseTokenSymbols = LinkedHashSet<String>()
+//                val baseTokenSymbols = LinkedHashSet<String>()
 
                 paris.map {
                     withContext(Dispatchers.IO + CoroutineExceptionHandler { coroutineContext, throwable ->
@@ -97,19 +97,19 @@ class MainActivity : AppCompatActivity() {
                         Log.e("my", throwable.message ?: "trading-history Unknown Error")
                     }) {
                         // get token symbol
-                        client.newCall(Request.Builder().url("https://www.dextools.io/shared/data/pair?address=$it&chain=ether").build()).execute().use {
-                            if (it.isSuccessful) {
-                                val pair =
-                                    gson.fromJson(it.body?.string(), Pair::class.java)
-                                val base = pair.data?.firstOrNull()?.run {
-                                    "${this.symbol}/${this.symbolRef} ${this.name}"
-                                }?:"Unknown Token"
-                                baseTokenSymbols.add(base)
-
-                            } else {
-                                baseTokenSymbols.add(it.message)
-                            }
-                        }
+//                        client.newCall(Request.Builder().url("https://www.dextools.io/shared/data/pair?address=$it&chain=ether").build()).execute().use {
+//                            if (it.isSuccessful) {
+//                                val pair =
+//                                    gson.fromJson(it.body?.string(), Pair::class.java)
+//                                val base = pair.data?.firstOrNull()?.run {
+//                                    "${this.symbol}/${this.symbolRef} ${this.name}"
+//                                }?:"Unknown Token"
+//                                baseTokenSymbols.add(base)
+//
+//                            } else {
+//                                baseTokenSymbols.add(it.message)
+//                            }
+//                        }
 
                         // get trading history
                         var isTradingHistoryNull: Boolean
@@ -187,7 +187,7 @@ class MainActivity : AppCompatActivity() {
                 }.apply {
 
                     Log.e("my", "Is the result(${this.size}) equal to ${oldestN * paris.size}?")
-                    Log.e("my", baseTokenSymbols.toString())
+//                    Log.e("my", baseTokenSymbols.toString())
                     Log.e("my", this.joinToString(",\n"))
 
                 }.mapIndexed { index, s ->
@@ -207,9 +207,9 @@ class MainActivity : AppCompatActivity() {
                 }.sortedByDescending {
                     it.second.size
                 }.map {
-                    val tokenSymbolsArray = baseTokenSymbols.toArray()
+//                    val tokenSymbolsArray = baseTokenSymbols.toArray()
                     val tokens = it.second.map {
-                        "bought token [${tokenSymbolsArray[it.key]}] ${it.value.size} times ${it.value.map { "$it -> ${toOrdinal((it + 1) % (oldestN + 1))}" }}"
+                        "bought token [${it.key}] ${it.value.size} times ${it.value.map { "$it -> ${toOrdinal((it + 1) % (oldestN + 1))}" }}"
                     }.toList().joinToString(", \n")
 //                    println("Address [${it.first}]:\n${tokens}")
                     val row = "Address [${it.first}]:\n${tokens}"
