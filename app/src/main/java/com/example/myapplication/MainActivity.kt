@@ -26,6 +26,7 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.myapplication.Result
 import com.facebook.stetho.okhttp3.StethoInterceptor
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.*
@@ -55,6 +56,10 @@ class MainActivity : AppCompatActivity() {
 
     private val buttonStart: Button by lazy {
         findViewById(R.id.buttonStart)
+    }
+
+    private val buttonAnalysis:Button by lazy {
+        findViewById(R.id.buttonAnalysis)
     }
 
     private val progressDialog:ProgressDialog by lazy {
@@ -245,6 +250,130 @@ class MainActivity : AppCompatActivity() {
                     val builder = SpannableStringBuilder()
                     it.forEach {
                         builder.appendLine(it)
+                    }
+                    textViewResults.text = builder
+                    textViewResults.movementMethod = LinkMovementMethod.getInstance()
+                    textViewResults.highlightColor = Color.TRANSPARENT
+                }
+            }
+        }
+
+        buttonAnalysis.setOnClickListener {
+            lifecycleScope.launch {
+//                lifecycle.repeatOnLifecycle(Lifecycle.State.CREATED) {
+//
+//                }
+                progressDialog.show()
+
+                val oldestN = editTextCount.text.toString().toInt()
+//                val baseTokenSymbols = LinkedHashSet<String>()
+
+                paris.map {
+                    withContext(Dispatchers.IO + CoroutineExceptionHandler { coroutineContext, throwable ->
+                        // do nothing
+                        Log.e("my", throwable.message ?: "trading-history Unknown Error")
+                    }) {
+                        // get token symbol
+//                        client.newCall(Request.Builder().url("https://www.dextools.io/shared/data/pair?address=$it&chain=ether").build()).execute().use {
+//                            if (it.isSuccessful) {
+//                                val pair =
+//                                    gson.fromJson(it.body?.string(), Pair::class.java)
+//                                val base = pair.data?.firstOrNull()?.run {
+//                                    "${this.symbol}/${this.symbolRef} ${this.name}"
+//                                }?:"Unknown Token"
+//                                baseTokenSymbols.add(base)
+//
+//                            } else {
+//                                baseTokenSymbols.add(it.message)
+//                            }
+//                        }
+
+                        // get trading history
+                        var isTradingHistoryNull: Boolean
+                        var tb: Long? = null
+                        val pair = it
+                        val tradingHistory = mutableListOf<TradingHistory>()
+                        do {
+                            val url = if (tb == null) {
+                                "https://io.dexscreener.com/dex/log/amm/uniswap/all/ethereum/$pair?q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+//                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                            } else {
+                                "https://io.dexscreener.com/dex/log/amm/uniswap/all/ethereum/$pair?tb=$tb&q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+//                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?tb=$tb&q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                            }
+
+                            val request = okhttp3.Request.Builder()
+                                .url(url)
+                                .build()
+
+                            client.newCall(request).execute().use {
+                                if (it.isSuccessful) {
+                                    val history =
+                                        gson.fromJson(it.body?.string(), History::class.java)
+                                    isTradingHistoryNull = history.logs != null
+//                                    baseTokenSymbols.add(history.baseTokenSymbol?:"Unknown Token")
+
+                                    history.logs?.filterNotNull()?.let {
+                                        tb = it.lastOrNull()?.blockTimestamp
+                                        tradingHistory.addAll(it)
+                                    }
+                                } else {
+                                    isTradingHistoryNull = true
+                                }
+                            }
+
+                        } while (isTradingHistoryNull)
+
+                        // need to group transactions by `maker`
+                        tradingHistory.groupBy {
+                            it.maker
+                        }.map {
+                            val groupedTradingHistory = it.value.groupBy {
+                                it.txnType
+                            }
+                            val totalBuyAmount = groupedTradingHistory.getOrElse("buy") { emptyList() }.sumOf { it.amount1?.toDoubleOrNull()?:0.0 }
+                            val totalSellAmount = groupedTradingHistory.getOrElse("sell") { emptyList() }.sumOf { it.amount1?.toDoubleOrNull()?:0.0 }
+                            val logs = it.value.map {
+                                "👉${it.txnType} ${it.amount1} ETH"
+                            }.joinToString("\n")
+                            Result(it.key,logs,(totalSellAmount - totalBuyAmount))
+                        }.sortedByDescending {
+                            it.gain
+                        }
+                    }
+                }.map {
+                    it.map {
+                        val row = "Address [${it.address}]\n${it.logs}\n💴gained ${it.gain} ETH"
+                        val ss = SpannableString(row)
+                        val clickableSpan = object:ClickableSpan() {
+                            override fun onClick(p0: View) {
+                                Toast.makeText(this@MainActivity, "Text copied to clipboard.", Toast.LENGTH_SHORT).show()
+                                val clipboard: ClipboardManager =
+                                    getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText(null, it.address)
+                                clipboard.setPrimaryClip(clip)
+                            }
+
+                            override fun updateDrawState(ds: TextPaint) {
+                                super.updateDrawState(ds)
+                                ds.isUnderlineText = false
+                            }
+                        }
+                        val start = row.indexOf(it.address?:"")
+                        val end = start + (it.address?.length?:0)
+                        ss.setSpan(clickableSpan,start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+                        ss
+                    }
+//                    val row = "Address [${}]:\n${tokens}"
+//                    Log.e("my", row)
+                }.let {
+                    progressDialog.hide()
+                    val builder = SpannableStringBuilder()
+                    it.forEach {
+                        it.forEach {
+                            builder.appendLine(it)
+                        }
                     }
                     textViewResults.text = builder
                     textViewResults.movementMethod = LinkMovementMethod.getInstance()
