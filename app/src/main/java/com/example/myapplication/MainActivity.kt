@@ -18,6 +18,7 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -62,6 +63,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val editTextCount: EditText by lazy {
+        findViewById(R.id.editTextCount)
+    }
+
     /*
         "0xe00ed75bf786c4bc5a2bc700f82d58a13efbe993",
         "0xe2773ac103bc59b6abdc77722c516ad4a70961f8",
@@ -88,7 +93,7 @@ class MainActivity : AppCompatActivity() {
 //                }
                 progressDialog.show()
 
-                val oldestN = 30
+                val oldestN = editTextCount.text.toString().toInt()
 //                val baseTokenSymbols = LinkedHashSet<String>()
 
                 paris.map {
@@ -284,6 +289,8 @@ class MainActivity : AppCompatActivity() {
 
                 textViewParis.text = paris.joinToString(",\n")
                 buttonStart.isVisible = paris.isNotEmpty()
+
+                // clear clipboard
             }
         }
     }
