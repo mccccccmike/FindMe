@@ -37,6 +37,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.jetbrains.annotations.TestOnly
 import java.io.*
 import java.util.*
+// Parse Dependencies
+import com.parse.FunctionCallback;
+import com.parse.ParseCloud;
+import com.parse.ParseException;
 
 class MainActivity : AppCompatActivity() {
 
@@ -60,6 +64,10 @@ class MainActivity : AppCompatActivity() {
 
     private val buttonAnalysis:Button by lazy {
         findViewById(R.id.buttonAnalysis)
+    }
+
+    private val buttonSave: Button by lazy {
+        findViewById(R.id.buttonSave)
     }
 
     private val progressDialog:ProgressDialog by lazy {
@@ -378,6 +386,102 @@ class MainActivity : AppCompatActivity() {
                     textViewResults.text = builder
                     textViewResults.movementMethod = LinkMovementMethod.getInstance()
                     textViewResults.highlightColor = Color.TRANSPARENT
+                }
+            }
+        }
+
+        buttonSave.setOnClickListener {
+            lifecycleScope.launch {
+//                lifecycle.repeatOnLifecycle(Lifecycle.State.CREATED) {
+//
+//                }
+                progressDialog.show()
+
+                val oldestN = editTextCount.text.toString().toInt()
+//                val baseTokenSymbols = LinkedHashSet<String>()
+
+                paris.map {
+                    withContext(Dispatchers.IO + CoroutineExceptionHandler { coroutineContext, throwable ->
+                        // do nothing
+                        Log.e("my", throwable.message ?: "trading-history Unknown Error")
+                        Toast.makeText(this@MainActivity, throwable.message ?: "trading-history Unknown Error", Toast.LENGTH_SHORT).show()
+                    }) {
+                        // get token symbol
+//                        client.newCall(Request.Builder().url("https://www.dextools.io/shared/data/pair?address=$it&chain=ether").build()).execute().use {
+//                            if (it.isSuccessful) {
+//                                val pair =
+//                                    gson.fromJson(it.body?.string(), Pair::class.java)
+//                                val base = pair.data?.firstOrNull()?.run {
+//                                    "${this.symbol}/${this.symbolRef} ${this.name}"
+//                                }?:"Unknown Token"
+//                                baseTokenSymbols.add(base)
+//
+//                            } else {
+//                                baseTokenSymbols.add(it.message)
+//                            }
+//                        }
+
+                        // get trading history
+                        var isTradingHistoryNull: Boolean
+                        var tb: Long? = null
+                        val pair = it
+                        val tradingHistory = mutableListOf<TradingHistory>()
+                        do {
+                            val url = if (tb == null) {
+                                "https://io.dexscreener.com/dex/log/amm/uniswap/all/ethereum/$pair?q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+//                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                            } else {
+                                "https://io.dexscreener.com/dex/log/amm/uniswap/all/ethereum/$pair?tb=$tb&q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+//                                "https://io.dexscreener.com/u/trading-history/recent/ethereum/$pair?tb=$tb&q=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                            }
+
+                            val request = okhttp3.Request.Builder()
+                                .url(url)
+                                .build()
+
+                            client.newCall(request).execute().use {
+                                if (it.isSuccessful) {
+                                    val history =
+                                        gson.fromJson(it.body?.string(), History::class.java)
+                                    isTradingHistoryNull = history.logs != null
+//                                    baseTokenSymbols.add(history.baseTokenSymbol?:"Unknown Token")
+
+                                    history.logs?.filterNotNull()?.let {
+                                        tb = it.lastOrNull()?.blockTimestamp
+                                        tradingHistory.addAll(it)
+                                    }
+                                } else {
+                                    isTradingHistoryNull = true
+                                }
+                            }
+
+                        } while (isTradingHistoryNull)
+
+                        // need to filter out buy transactions
+                        tradingHistory
+                            .filter { it.txnType == "buy" }
+                            .takeLast(oldestN).reversed()
+                    }
+                }.flatMap {
+                    it
+                }.mapNotNull {
+                    it.maker
+                }.apply {
+                    progressDialog.hide()
+                    // Use this map to send parameters to your Cloud Code function
+                    // Just push the parameters you want into it
+                    val parameters: HashMap<String, List<String>>  = HashMap<String, List<String>>()
+                    parameters["alphas"] = this
+                    // This calls the function in the Cloud Code
+                    ParseCloud.callFunctionInBackground("FindAlpha", parameters, FunctionCallback<Map<String, Any>> { _, e ->
+                        if (e == null) {
+                            // Everything is alright
+                            Toast.makeText(this@MainActivity, "Everything is alright", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // Something went wrong
+                            textViewResults.text = e.message
+                        }
+                    })
                 }
             }
         }

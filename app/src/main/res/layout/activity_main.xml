@@ -21,7 +21,7 @@
         <EditText
             android:id="@+id/editTextCount"
             android:layout_width="wrap_content"
-            android:text="30"
+            android:text="55"
             android:inputType="number"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="@id/buttonStart"
@@ -42,6 +42,15 @@
             android:text="分析"
             android:id="@+id/buttonAnalysis"
             app:layout_constraintStart_toEndOf="@id/buttonStart"
+            app:layout_constraintBottom_toBottomOf="@id/buttonStart"
+            app:layout_constraintTop_toTopOf="@id/buttonStart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:text="保存"
+            android:id="@+id/buttonSave"
+            app:layout_constraintStart_toEndOf="@id/buttonAnalysis"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="@id/buttonStart"
             app:layout_constraintTop_toTopOf="@id/buttonStart"
