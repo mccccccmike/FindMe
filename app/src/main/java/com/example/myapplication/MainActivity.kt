@@ -476,7 +476,7 @@ class MainActivity : AppCompatActivity() {
                     ParseCloud.callFunctionInBackground("FindAlpha", parameters, FunctionCallback<Map<String, Any>> { _, e ->
                         if (e == null) {
                             // Everything is alright
-                            Toast.makeText(this@MainActivity, "Everything is alright", Toast.LENGTH_SHORT).show()
+                            textViewResults.text = "Everything is alright"
                         } else {
                             // Something went wrong
                             textViewResults.text = e.message
